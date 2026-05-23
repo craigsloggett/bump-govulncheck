@@ -1,0 +1,37 @@
+name: Lint
+
+on: pull_request
+
+permissions:
+  contents: read
+
+jobs:
+  actionlint:
+    name: GitHub Actions
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Lint Workflow Files
+        uses: craigsloggett/lint-github-actions-workflows@70fecd2e1cab22917ba591a4c543f148e7e807a4 # v1.0.5
+
+  yamllint:
+    name: YAML
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Lint YAML Files
+        uses: craigsloggett/lint-yaml@ee49d22bec6c5d0b0d8e2c4774a1f172b0483b35 # v1.0.20
+
+  shellcheck:
+    name: Shell
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Lint Shell Scripts
+        uses: craigsloggett/lint-shell@f378bb2e47328b0946eea600bdda1d0f960b4898 # v1.0.0
