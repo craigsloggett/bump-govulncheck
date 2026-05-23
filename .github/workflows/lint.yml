@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Lint YAML Files
-        uses: craigsloggett/lint-yaml@ee49d22bec6c5d0b0d8e2c4774a1f172b0483b35 # v1.0.20
+        uses: craigsloggett/lint-yaml@747f85f46ec4711f7cb87e031f635e12e7310c98 # v1.0.21
 
   shellcheck:
     name: Shell
