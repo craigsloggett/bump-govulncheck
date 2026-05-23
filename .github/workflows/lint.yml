@@ -34,4 +34,4 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Lint Shell Scripts
-        uses: craigsloggett/lint-shell@f378bb2e47328b0946eea600bdda1d0f960b4898 # v1.0.0
+        uses: craigsloggett/lint-shell@92d33c5528427fc13f2883aff90cb7439e3cb56d # v1.0.1
