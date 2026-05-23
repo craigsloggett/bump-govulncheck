@@ -1,6 +1,6 @@
-name: My Composite Action
+name: Bump govulncheck
 
-description: A composite action that ...
+description: A composite action to bump the govulncheck version.
 
 inputs:
   my-input:
