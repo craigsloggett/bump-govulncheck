@@ -23,6 +23,9 @@ outputs:
   version:
     description: The latest govulncheck version.
     value: ${{ steps.bump.outputs.version }}
+  changed:
+    description: Whether the file was modified by this run (true|false).
+    value: ${{ steps.bump.outputs.changed }}
 
 runs:
   using: composite
@@ -33,6 +36,6 @@ runs:
       shell: sh
       env:
         FILE: ${{ inputs.file }}
-        VALUE_PATH: ${{ inputs.path }}
+        YAML_PATH: ${{ inputs.path }}
         LINE_MATCH: ${{ inputs.match }}
         LINE_REPLACE: ${{ inputs.replace }}

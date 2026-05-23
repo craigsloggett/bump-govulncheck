@@ -1,48 +1,97 @@
 #!/bin/sh
 
-set -eu
+set -euf
 
-VERSION=$(curl -sf https://proxy.golang.org/golang.org/x/vuln/@latest | jq -r '.Version')
+: "${YAML_PATH:=}"
+: "${LINE_MATCH:=}"
+: "${LINE_REPLACE:=}"
 
-if [ -z "${VERSION}" ] || [ "${VERSION}" = "null" ]; then
-  printf 'Failed to determine the latest govulncheck version.\n' >&2
+# -----------------------------------------------------------------------------
+# Per-tool version discovery — the only per-tool variation across bump-* repos.
+# -----------------------------------------------------------------------------
+
+discover_version() {
+  curl -sf https://proxy.golang.org/golang.org/x/vuln/@latest | jq -r '.Version'
+}
+
+# -----------------------------------------------------------------------------
+# Shared helpers.
+# -----------------------------------------------------------------------------
+
+die() {
+  printf '%s\n' "$1" >&2
   exit 1
-fi
+}
 
-if [ ! -f "${FILE}" ]; then
-  printf 'File not found: %s\n' "${FILE}" >&2
-  exit 1
-fi
+validate_inputs() {
+  [ -f "${FILE}" ] || die "File not found: ${FILE}"
 
-if [ -n "${VALUE_PATH}" ] && [ -n "${LINE_MATCH}${LINE_REPLACE}" ]; then
-  printf 'Provide either "path" or "match"+"replace", not both.\n' >&2
-  exit 1
-fi
+  if [ -n "${LINE_MATCH}" ] && [ -z "${LINE_REPLACE}" ]; then
+    die '"match" was provided without "replace".'
+  fi
+  if [ -z "${LINE_MATCH}" ] && [ -n "${LINE_REPLACE}" ]; then
+    die '"replace" was provided without "match".'
+  fi
+  if [ -n "${YAML_PATH}" ] && [ -n "${LINE_MATCH}" ]; then
+    die 'Provide either "path" or "match"+"replace", not both.'
+  fi
+  if [ -z "${YAML_PATH}" ] && [ -z "${LINE_MATCH}" ]; then
+    die 'Provide either "path" (for YAML) or "match"+"replace" (for line-based files).'
+  fi
+}
 
-if [ -n "${VALUE_PATH}" ]; then
-  CURRENT=$(yq eval "${VALUE_PATH}" "${FILE}")
-  if [ "${CURRENT}" = "null" ]; then
-    printf 'Path %s not found in %s.\n' "${VALUE_PATH}" "${FILE}" >&2
-    exit 1
+bump_yaml() {
+  _current=$(yq "${YAML_PATH}" "${FILE}")
+  if [ "${_current}" = "null" ]; then
+    die "Path ${YAML_PATH} not found in ${FILE}."
   fi
-  if [ "${CURRENT}" != "${VERSION}" ]; then
-    yq eval "${VALUE_PATH} = \"${VERSION}\"" -i "${FILE}"
+  if [ "${_current}" = "${VERSION}" ]; then
+    CHANGED=false
+    return
   fi
-elif [ -n "${LINE_MATCH}" ] && [ -n "${LINE_REPLACE}" ]; then
-  MATCHES=$(awk -v pattern="${LINE_MATCH}" '$0 ~ pattern { c++ } END { print c+0 }' "${FILE}")
-  if [ "${MATCHES}" -eq 0 ]; then
-    printf 'No line in %s matched pattern: %s\n' "${FILE}" "${LINE_MATCH}" >&2
-    exit 1
+  yq "${YAML_PATH} = \"${VERSION}\"" -i "${FILE}"
+  CHANGED=true
+}
+
+bump_line() {
+  _matches=$(awk -v pattern="${LINE_MATCH}" '$0 ~ pattern { c++ } END { print c+0 }' "${FILE}")
+  if [ "${_matches}" -eq 0 ]; then
+    die "No line in ${FILE} matched pattern: ${LINE_MATCH}"
   fi
-  REPLACEMENT=$(printf '%s' "${LINE_REPLACE}" | sed "s|{version}|${VERSION}|g")
-  awk -v pattern="${LINE_MATCH}" -v replacement="${REPLACEMENT}" '
+  if [ "${_matches}" -gt 1 ]; then
+    die "Pattern matched ${_matches} lines in ${FILE}; refine the pattern to match exactly one line."
+  fi
+  _replacement=$(printf '%s' "${LINE_REPLACE}" | sed "s|{version}|${VERSION}|g")
+  _current=$(awk -v pattern="${LINE_MATCH}" '$0 ~ pattern { print; exit }' "${FILE}")
+  if [ "${_current}" = "${_replacement}" ]; then
+    CHANGED=false
+    return
+  fi
+  awk -v pattern="${LINE_MATCH}" -v replacement="${_replacement}" '
     $0 ~ pattern { print replacement; next }
     { print }
   ' "${FILE}" >"${FILE}.new"
   mv "${FILE}.new" "${FILE}"
-else
-  printf 'Provide either "path" (for YAML) or "match"+"replace" (for line-based files).\n' >&2
-  exit 1
-fi
+  CHANGED=true
+}
 
-printf 'version=%s\n' "${VERSION}" >>"${GITHUB_OUTPUT}"
+emit_outputs() {
+  printf 'version=%s\n' "${VERSION}" >>"${GITHUB_OUTPUT}"
+  printf 'changed=%s\n' "${CHANGED}" >>"${GITHUB_OUTPUT}"
+}
+
+main() {
+  VERSION=$(discover_version)
+  if [ -z "${VERSION}" ] || [ "${VERSION}" = "null" ]; then
+    die 'Failed to determine the latest version.'
+  fi
+  validate_inputs
+  if [ -n "${YAML_PATH}" ]; then
+    bump_yaml
+  else
+    bump_line
+  fi
+  emit_outputs
+}
+
+main "$@"

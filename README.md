@@ -34,10 +34,11 @@ Pair with [`craigsloggett/create-github-pull-request`](https://github.com/craigs
 | `match`   | `false`   |         | Regex pattern matching the line to update in the file. Use with `replace`.                                   |
 | `replace` | `false`   |         | Replacement line. Use `{version}` as the placeholder for the new version.                                    |
 
-Provide either `path` (for YAML) or `match` and `replace` (for line-based files), not both.
+Provide either `path` (for YAML) or `match` and `replace` (for line-based files), not both. In line-based mode the pattern must match exactly one line; the action errors out if zero or more than one lines match, so refine the pattern if needed.
 
 ### Outputs
 
-| Output    | Description                       |
-| --------- | --------------------------------- |
-| `version` | The latest `govulncheck` version. |
+| Output    | Description                                            |
+| --------- | ------------------------------------------------------ |
+| `version` | The latest `govulncheck` version.                      |
+| `changed` | Whether the file was modified by this run (true/false). |
