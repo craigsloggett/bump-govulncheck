@@ -1,41 +1,43 @@
 # bump-govulncheck
 
-A composite action to bump the govulncheck version.
+A composite action that fetches the latest `govulncheck` release and updates a target file with the new version.
 
 ## Usage
 
+Update a YAML value by path:
+
 ```yaml
-name: Bump
-
-on:
-  schedule:
-    - cron: '0 0 * * *'
-  workflow_dispatch:
-
-permissions:
-  contents: write
-  pull-requests: write
-
-jobs:
-  bump:
-    name: govulncheck
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Bump govulncheck
-        uses: craigsloggett/bump-govulncheck@v1
+- uses: craigsloggett/bump-govulncheck@v1
+  with:
+    file: action.yml
+    path: .inputs.govulncheck-version.default
 ```
+
+Update a line by regex:
+
+```yaml
+- uses: craigsloggett/bump-govulncheck@v1
+  with:
+    file: Makefile
+    match: '^GOVULNCHECK_VERSION'
+    replace: 'GOVULNCHECK_VERSION   := {version}'
+```
+
+Pair with [`craigsloggett/create-github-pull-request`](https://github.com/craigsloggett/create-github-pull-request) to open a pull request for the resulting working tree changes.
 
 ### Inputs
 
-| Input            | Required? | Default                    | Description                                        |
-| ---------------- | --------- | -------------------------- | -------------------------------------------------- |
-| `my-input`       | `false`   | `The default description.` | This is my input, there is no other input like it. |
+| Input     | Required? | Default | Description                                                                                                  |
+| --------- | --------- | ------- | ------------------------------------------------------------------------------------------------------------ |
+| `file`    | `true`    |         | Path to the file to update.                                                                                  |
+| `path`    | `false`   |         | yq expression targeting the value to update in the file (e.g. `.inputs.govulncheck-version.default`).        |
+| `match`   | `false`   |         | Regex pattern matching the line to update in the file. Use with `replace`.                                   |
+| `replace` | `false`   |         | Replacement line. Use `{version}` as the placeholder for the new version.                                    |
+
+Provide either `path` (for YAML) or `match` and `replace` (for line-based files), not both.
 
 ### Outputs
 
-| Output      | Description                                |
-| ----------- | ------------------------------------------ |
-| `my-output` | The output this composite action produces. |
+| Output    | Description                       |
+| --------- | --------------------------------- |
+| `version` | The latest `govulncheck` version. |
