@@ -88,6 +88,12 @@ bump_yaml() {
     2) die "Pattern '${MATCH}' did not match on line ${line_number} of ${FILE}." ;;
     *) exit 1 ;;
   esac
+
+  cmp -s "${FILE}" "${STAGING}" &&
+    return 1 # No change, signal VERSION_CHANGED="false"
+
+  mv "${STAGING}" "${FILE}" ||
+    exit 1
 }
 
 bump_line() {
@@ -109,15 +115,13 @@ bump_line() {
     { print }                              # Passthrough for non-matching lines.
   ' "${FILE}" >"${STAGING}" ||
     exit 1
-}
 
-commit_staging() (
-  # cmp -s exits 0 when FILE and STAGING are identical (no change). Promote
-  # that to a non-zero return so callers can treat 0 as "file actually
-  # changed" and 1 as "no-op". Only mv when there is something to commit.
-  cmp -s "${FILE}" "${STAGING}" && return 1
-  mv "${STAGING}" "${FILE}"
-)
+  cmp -s "${FILE}" "${STAGING}" &&
+    return 1 # No change, signal VERSION_CHANGED="false"
+
+  mv "${STAGING}" "${FILE}" ||
+    exit 1
+}
 
 emit_outputs() {
   {
@@ -153,14 +157,12 @@ main() {
   LATEST_VERSION=$(discover_latest_version)
   readonly LATEST_VERSION
 
-  if [ -n "${YAML_PATH}" ]; then
-    bump_yaml
-  else
-    bump_line
-  fi
-
   VERSION_CHANGED="false"
-  commit_staging && VERSION_CHANGED="true"
+  if [ -n "${YAML_PATH}" ]; then
+    bump_yaml && VERSION_CHANGED="true"
+  else
+    bump_line && VERSION_CHANGED="true"
+  fi
   readonly VERSION_CHANGED
 
   emit_outputs
