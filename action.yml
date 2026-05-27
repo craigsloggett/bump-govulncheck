@@ -22,17 +22,17 @@ inputs:
 outputs:
   version:
     description: The latest govulncheck version.
-    value: ${{ steps.bump.outputs.version }}
+    value: ${{ steps.bump-govulncheck.outputs.version }}
   changed:
     description: Whether the file was modified by this run (true|false).
-    value: ${{ steps.bump.outputs.changed }}
+    value: ${{ steps.bump-govulncheck.outputs.changed }}
 
 runs:
   using: composite
   steps:
     - name: Bump govulncheck
-      id: bump
-      run: ${{ github.action_path }}/src/bump.sh
+      id: bump-govulncheck
+      run: ${{ github.action_path }}/src/bump_govulncheck.sh
       shell: sh
       env:
         FILE: ${{ inputs.file }}
