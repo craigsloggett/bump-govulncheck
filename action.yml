@@ -1,25 +1,45 @@
 name: Bump govulncheck
 
-description: A composite action to bump the govulncheck version.
+description: Update the govulncheck version in a file to the latest available release.
 
 inputs:
-  my-input:
-    description: This is my input, there is no other input like it.
+  file:
+    description: Path to the file to update.
+    required: true
+  path:
+    description: >
+      yq expression locating the line to update (e.g. .inputs.govulncheck-version.default).
+      Mutually exclusive with replace.
     required: false
-    default: The default description.
+    default: ''
+  match:
+    description: Regex matching the line to rewrite. Pair with replace.
+    required: false
+    default: ''
+  replace:
+    description: >
+      Replacement line. Use {version} as the placeholder for the new version.
+      Pair with match.
+    required: false
+    default: ''
 
 outputs:
-  my-output:
-    description: The output this composite action produces.
-    value: steps.workflow-step.outputs.my-output
+  version:
+    description: The latest govulncheck version.
+    value: ${{ steps.bump-govulncheck.outputs.version }}
+  changed:
+    description: Whether the file was modified by this run (true|false).
+    value: ${{ steps.bump-govulncheck.outputs.changed }}
 
 runs:
   using: composite
   steps:
-    - name: Workflow Step
-      id: workflow-step
-      run: |-
-        printf 'my-output=%s\n' "${MY_INPUT}" >> "${GITHUB_OUTPUT}"
+    - name: Bump govulncheck
+      id: bump-govulncheck
+      run: ${{ github.action_path }}/src/bump_govulncheck.sh
       shell: sh
       env:
-        MY_INPUT: inputs.my-input
+        FILE: ${{ inputs.file }}
+        YAML_PATH: ${{ inputs.path }}
+        LINE_MATCH: ${{ inputs.match }}
+        LINE_REPLACE: ${{ inputs.replace }}

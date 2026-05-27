@@ -1,41 +1,71 @@
 # bump-govulncheck
 
-A composite action to bump the govulncheck version.
+A composite action that fetches the latest `govulncheck` release and updates a target file with the new version.
 
 ## Usage
 
+Update a YAML value located by path:
+
 ```yaml
-name: Bump
-
-on:
-  schedule:
-    - cron: '0 0 * * *'
-  workflow_dispatch:
-
-permissions:
-  contents: write
-  pull-requests: write
-
-jobs:
-  bump:
-    name: govulncheck
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Bump govulncheck
-        uses: craigsloggett/bump-govulncheck@v1
+- uses: craigsloggett/bump-govulncheck@v1
+  with:
+    file: action.yml
+    path: .inputs.govulncheck-version.default
 ```
 
-### Inputs
+Update a line by regex:
 
-| Input            | Required? | Default                    | Description                                        |
-| ---------------- | --------- | -------------------------- | -------------------------------------------------- |
-| `my-input`       | `false`   | `The default description.` | This is my input, there is no other input like it. |
+```yaml
+- uses: craigsloggett/bump-govulncheck@v1
+  with:
+    file: Makefile
+    match: '^GOVULNCHECK_VERSION'
+    replace: 'GOVULNCHECK_VERSION := {version}'
+```
 
-### Outputs
+Open a pull request with the bump:
 
-| Output      | Description                                |
-| ----------- | ------------------------------------------ |
-| `my-output` | The output this composite action produces. |
+```yaml
+- name: Bump govulncheck
+  id: bump-govulncheck
+  uses: craigsloggett/bump-govulncheck@v1
+  with:
+    file: Makefile
+    match: '^GOVULNCHECK_VERSION'
+    replace: 'GOVULNCHECK_VERSION := {version}'
+
+- name: Open Pull Request
+  uses: craigsloggett/create-github-pull-request@v1
+  with:
+    title: 'chore(build): Update govulncheck to ${{ steps.bump-govulncheck.outputs.version }}'
+    branch: update-govulncheck-to-${{ steps.bump-govulncheck.outputs.version }}
+```
+
+## Inputs
+
+| Input     | Required | Default | Description                                                                                  |
+| --------- | -------- | ------- | -------------------------------------------------------------------------------------------- |
+| `file`    | Yes      |         | Path to the file to update.                                                                  |
+| `path`    | No       |         | yq expression locating the line to update (e.g. `.inputs.govulncheck-version.default`).      |
+| `match`   | No       |         | Regex matching the line to rewrite. Pair with `replace`.                                     |
+| `replace` | No       |         | Replacement line. Use `{version}` as the placeholder for the new version. Pair with `match`. |
+
+Provide either `path` (YAML mode) or `match`+`replace` (line mode), not both.
+
+For YAML replacements:
+
+- The path must begin with `.` and resolve to an existing line.
+- The first `vX.Y.Z` substring on the resolved line is rewritten; the rest of the line is preserved.
+
+For line-based replacements:
+
+- The match pattern must match exactly one line in the file.
+- The action errors out if zero or more than one lines match.
+- `{version}` is the only placeholder recognized in `replace`.
+
+## Outputs
+
+| Output    | Description                                                                                   |
+| --------- | --------------------------------------------------------------------------------------------- |
+| `version` | The latest `govulncheck` version, as reported by the Go module proxy.                         |
+| `changed` | `true` if the file was modified by this run, `false` if it was already at the latest version. |
