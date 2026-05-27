@@ -4,13 +4,14 @@ A composite action that fetches the latest `govulncheck` release and updates a t
 
 ## Usage
 
-Update a YAML value by path:
+Update a YAML value located by path:
 
 ```yaml
 - uses: craigsloggett/bump-govulncheck@v1
   with:
     file: action.yml
     path: .inputs.govulncheck-version.default
+    match: 'v[0-9]+\.[0-9]+\.[0-9]+'
 ```
 
 Update a line by regex:
@@ -42,26 +43,25 @@ Open a pull request only when the file actually changed:
 
 ## Inputs
 
-| Input     | Required | Default | Description                                                                                          |
-| --------- | -------- | ------- | ---------------------------------------------------------------------------------------------------- |
-| `file`    | Yes      |         | Path to the file to update.                                                                          |
-| `path`    | No       |         | yq expression targeting the value to update in the file (e.g. `.inputs.govulncheck-version.default`).|
-| `match`   | No       |         | Extended regex (ERE) matching the line to update. Use with `replace`.                                |
-| `replace` | No       |         | Replacement line. Use `{version}` as the placeholder for the new version.                            |
+| Input     | Required | Default | Description                                                                                                 |
+| --------- | -------- | ------- | ----------------------------------------------------------------------------------------------------------- |
+| `file`    | Yes      |         | Path to the file to update.                                                                                 |
+| `path`    | No       |         | yq expression locating the line to update (e.g. `.inputs.govulncheck-version.default`). Pair with `match`.  |
+| `match`   | No       |         | Regex. With `path`, matches the version substring on the located line. With `replace`, matches the line.    |
+| `replace` | No       |         | Replacement line. Use `{version}` as the placeholder for the new version. Pair with `match`.                |
 
-Provide either `path` (for YAML) or `match` and `replace` (for line-based files), not both.
+Provide either `path`+`match` (for YAML) or `match`+`replace` (for line-based files), not both.
 
 For YAML replacements:
 
-- The path must begin with `.` and resolve to an existing value.
-- The value must be a plain `MAJOR.MINOR.PATCH` version, optionally prefixed with `v` (no suffixes or constraint operators).
-- The value must sit on the same line as its key. Block and folded scalars are not supported; use `match`/`replace` instead.
+- The path must begin with `.` and resolve to an existing line.
+- `match` is an extended regex (ERE) identifying the version substring on the line that `path` locates. Only the substring it matches is rewritten; the rest of the line is preserved.
 
 For line-based replacements:
 
 - The match pattern must match exactly one line in the file.
 - The action errors out if zero or more than one lines match.
-- `{version}` is the only placeholder recognized in replace.
+- `{version}` is the only placeholder recognized in `replace`.
 
 ## Outputs
 

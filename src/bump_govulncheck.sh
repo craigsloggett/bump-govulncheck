@@ -10,8 +10,8 @@ set -euf
 
 # Optional user inputs.
 : "${YAML_PATH:=}"
-: "${LINE_MATCH:=}"
-: "${LINE_REPLACE:=}"
+: "${MATCH:=}"
+: "${REPLACE:=}"
 
 die() {
   printf '%s\n' "$1" >&2
@@ -28,20 +28,20 @@ validate_utilities() (
 validate_inputs() (
   [ -f "${FILE}" ] || die "File not found: ${FILE}"
 
-  if [ -n "${LINE_MATCH}" ] && [ -z "${LINE_REPLACE}" ]; then
-    die "'match' was provided without 'replace'."
+  if [ -n "${YAML_PATH}" ] && [ -n "${REPLACE}" ]; then
+    die "'path' and 'replace' are mutually exclusive; use 'path'+'match' for YAML or 'match'+'replace' for line-based files."
   fi
 
-  if [ -z "${LINE_MATCH}" ] && [ -n "${LINE_REPLACE}" ]; then
-    die "'replace' was provided without 'match'."
+  if [ -n "${YAML_PATH}" ] && [ -z "${MATCH}" ]; then
+    die "'path' requires 'match'."
   fi
 
-  if [ -n "${YAML_PATH}" ] && [ -n "${LINE_MATCH}" ]; then
-    die "Provide either 'path' or 'match'+'replace', not both."
+  if [ -n "${REPLACE}" ] && [ -z "${MATCH}" ]; then
+    die "'replace' requires 'match'."
   fi
 
-  if [ -z "${YAML_PATH}" ] && [ -z "${LINE_MATCH}" ]; then
-    die "Provide either 'path' or 'match'+'replace'."
+  if [ -z "${YAML_PATH}" ] && [ -z "${REPLACE}" ]; then
+    die "Provide either 'path'+'match' (YAML mode) or 'match'+'replace' (line mode)."
   fi
 
   if [ -n "${YAML_PATH}" ] && [ "${YAML_PATH#.}" = "${YAML_PATH}" ]; then
@@ -61,51 +61,45 @@ discover_latest_version() (
 )
 
 bump_yaml() {
-  current_version=$(yq "${YAML_PATH}" "${FILE}") ||
-    exit 1
-
-  [ "${current_version}" != "null" ] ||
-    die "Path ${YAML_PATH} not found in ${FILE}."
-
-  [ "${current_version}" != "${LATEST_VERSION}" ] ||
-    return 1 # No change, signal VERSION_CHANGED="false"
-
-  # Strip an optional leading 'v' so the plain-version check accepts both
-  # 'v1.2.3' (Go module style) and '1.2.3'.
-  case "${current_version#v}" in
-    *[!0-9.]*)
-      die "Value at ${YAML_PATH} is '${current_version}'; this action only bumps plain v?MAJOR.MINOR.PATCH versions."
-      ;;
-  esac
-
   line_number=$(yq "${YAML_PATH} | line" "${FILE}") ||
     exit 1
 
-  awk -v line="${line_number}" -v current_version="${current_version}" -v latest_version="${LATEST_VERSION}" '
-    NR == line {                           # Only apply this script to the line number supplied by `yq`.
-      sub(current_version, latest_version) # Substitute the value found at YAML_PATH with LATEST_VERSION.
+  [ "${line_number}" != "0" ] ||
+    die "Path ${YAML_PATH} not found in ${FILE}."
+
+  # `set -e` would terminate on awk's non-zero exit before the case statement
+  # can dispatch on the specific code, so capture status explicitly here.
+  status=0
+  awk -v line="${line_number}" -v pattern="${MATCH}" -v version="${LATEST_VERSION}" '
+    NR == line {                  # Only operate on the line yq located.
+      if (match($0, pattern)) {   # Find the version substring on that line.
+        matched = 1
+        sub(pattern, version)
+      }
     }
-    { print }                              # Passthrough for non-matching lines.
-  ' "${FILE}" >"${STAGING}" ||
-    exit 1
+    { print }                     # Passthrough for non-matching lines.
+    END {
+      if (!matched) exit 2        # Distinguish "regex did not match" from awk errors.
+    }
+  ' "${FILE}" >"${STAGING}" || status=$?
 
-  cmp -s "${FILE}" "${STAGING}" &&
-    die "Value for ${YAML_PATH} not on its key's line in ${FILE}; block/folded scalars are not supported, use 'match'+'replace' instead."
-
-  mv "${STAGING}" "${FILE}" ||
-    exit 1
+  case "${status}" in
+    0) ;;
+    2) die "Pattern '${MATCH}' did not match on line ${line_number} of ${FILE}." ;;
+    *) exit 1 ;;
+  esac
 }
 
 bump_line() {
-  match_count=$(grep -cE "${LINE_MATCH}" "${FILE}") || true
+  match_count=$(grep -cE "${MATCH}" "${FILE}") || true
 
   [ "${match_count}" -ge 1 ] ||
-    die "No line in ${FILE} matched pattern: ${LINE_MATCH}"
+    die "No line in ${FILE} matched pattern: ${MATCH}"
 
   [ "${match_count}" -le 1 ] ||
     die "Pattern matched ${match_count} lines in ${FILE}; refine the pattern to match exactly one line."
 
-  awk -v pattern="${LINE_MATCH}" -v replacement="${LINE_REPLACE}" -v version="${LATEST_VERSION}" '
+  awk -v pattern="${MATCH}" -v replacement="${REPLACE}" -v version="${LATEST_VERSION}" '
     $0 ~ pattern {                         # Match on the current line using the regex supplied in `pattern`.
       output = replacement                 # Working copy of the replacement template.
       gsub(/\{version\}/, version, output) # Substitute {version} with the latest version.
@@ -115,13 +109,15 @@ bump_line() {
     { print }                              # Passthrough for non-matching lines.
   ' "${FILE}" >"${STAGING}" ||
     exit 1
-
-  cmp -s "${FILE}" "${STAGING}" &&
-    return 1 # No change, signal VERSION_CHANGED="false"
-
-  mv "${STAGING}" "${FILE}" ||
-    exit 1
 }
+
+commit_staging() (
+  # cmp -s exits 0 when FILE and STAGING are identical (no change). Promote
+  # that to a non-zero return so callers can treat 0 as "file actually
+  # changed" and 1 as "no-op". Only mv when there is something to commit.
+  cmp -s "${FILE}" "${STAGING}" && return 1
+  mv "${STAGING}" "${FILE}"
+)
 
 emit_outputs() {
   {
@@ -157,12 +153,14 @@ main() {
   LATEST_VERSION=$(discover_latest_version)
   readonly LATEST_VERSION
 
-  VERSION_CHANGED="false"
   if [ -n "${YAML_PATH}" ]; then
-    bump_yaml && VERSION_CHANGED="true"
+    bump_yaml
   else
-    bump_line && VERSION_CHANGED="true"
+    bump_line
   fi
+
+  VERSION_CHANGED="false"
+  commit_staging && VERSION_CHANGED="true"
   readonly VERSION_CHANGED
 
   emit_outputs
