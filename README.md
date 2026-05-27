@@ -23,21 +23,22 @@ Update a line by regex:
     replace: 'GOVULNCHECK_VERSION := {version}'
 ```
 
-Open a pull request only when the file actually changed:
+Open a pull request with the bump:
 
 ```yaml
-- id: bump-govulncheck
+- name: Bump govulncheck
+  id: bump-govulncheck
   uses: craigsloggett/bump-govulncheck@v1
   with:
     file: Makefile
     match: '^GOVULNCHECK_VERSION'
     replace: 'GOVULNCHECK_VERSION := {version}'
 
-- if: steps.bump-govulncheck.outputs.changed == 'true'
+- name: Open Pull Request
   uses: craigsloggett/create-github-pull-request@v1
   with:
-    commit-message: 'chore(build): Bump govulncheck to ${{ steps.bump-govulncheck.outputs.version }}'
-    pull-request-head-branch: bump-govulncheck-${{ steps.bump-govulncheck.outputs.version }}
+    title: 'chore(build): Update govulncheck to ${{ steps.bump-govulncheck.outputs.version }}'
+    branch: update-govulncheck-to-${{ steps.bump-govulncheck.outputs.version }}
 ```
 
 ## Inputs
