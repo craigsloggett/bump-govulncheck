@@ -67,17 +67,10 @@ bump_yaml() {
   [ "${line_number}" != "0" ] ||
     die "Path ${YAML_PATH} not found in ${FILE}."
 
-  semver_pattern='v[0-9]+\.[0-9]+\.[0-9]+'
-
-  # `set -e` would terminate on awk's non-zero exit before the case statement
-  # can dispatch on the specific code, so capture status explicitly here.
   status=0
-  awk -v line="${line_number}" -v pattern="${semver_pattern}" -v version="${LATEST_VERSION}" '
-    NR == line {                  # Only operate on the line yq located.
-      if (match($0, pattern)) {   # Find the version substring on that line.
-        matched = 1
-        sub(pattern, version)
-      }
+  awk -v line="${line_number}" -v version="${LATEST_VERSION}" '
+    NR == line && sub(/v[0-9]+\.[0-9]+\.[0-9]+/, version) {
+      matched = 1
     }
     { print }                     # Passthrough for non-matching lines.
     END {
