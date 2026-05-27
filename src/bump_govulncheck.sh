@@ -10,8 +10,8 @@ set -euf
 
 # Optional user inputs.
 : "${YAML_PATH:=}"
-: "${MATCH:=}"
-: "${REPLACE:=}"
+: "${LINE_MATCH:=}"
+: "${LINE_REPLACE:=}"
 
 die() {
   printf '%s\n' "$1" >&2
@@ -28,16 +28,20 @@ validate_utilities() (
 validate_inputs() (
   [ -f "${FILE}" ] || die "File not found: ${FILE}"
 
-  if [ -n "${YAML_PATH}" ] && [ -n "${REPLACE}" ]; then
-    die "'path' and 'replace' are mutually exclusive; use 'path' for YAML or 'match'+'replace' for line-based files."
+  if [ -n "${YAML_PATH}" ] && [ -n "${LINE_MATCH}" ]; then
+    die "Provide either 'path' or 'match'+'replace', not both."
   fi
 
-  if [ -n "${REPLACE}" ] && [ -z "${MATCH}" ]; then
-    die "'replace' requires 'match'."
+  if [ -n "${LINE_MATCH}" ] && [ -z "${LINE_REPLACE}" ]; then
+    die "'match' was provided without 'replace'."
   fi
 
-  if [ -z "${YAML_PATH}" ] && [ -z "${REPLACE}" ]; then
-    die "Provide either 'path' (YAML mode) or 'match'+'replace' (line mode)."
+  if [ -z "${LINE_MATCH}" ] && [ -n "${LINE_REPLACE}" ]; then
+    die "'replace' was provided without 'match'."
+  fi
+
+  if [ -z "${YAML_PATH}" ] && [ -z "${LINE_MATCH}" ]; then
+    die "Provide either 'path' or 'match'+'replace'."
   fi
 
   if [ -n "${YAML_PATH}" ] && [ "${YAML_PATH#.}" = "${YAML_PATH}" ]; then
@@ -95,15 +99,15 @@ bump_yaml() {
 }
 
 bump_line() {
-  match_count=$(grep -cE "${MATCH}" "${FILE}") || true
+  match_count=$(grep -cE "${LINE_MATCH}" "${FILE}") || true
 
   [ "${match_count}" -ge 1 ] ||
-    die "No line in ${FILE} matched pattern: ${MATCH}"
+    die "No line in ${FILE} matched pattern: ${LINE_MATCH}"
 
   [ "${match_count}" -le 1 ] ||
     die "Pattern matched ${match_count} lines in ${FILE}; refine the pattern to match exactly one line."
 
-  awk -v pattern="${MATCH}" -v replacement="${REPLACE}" -v version="${LATEST_VERSION}" '
+  awk -v pattern="${LINE_MATCH}" -v replacement="${LINE_REPLACE}" -v version="${LATEST_VERSION}" '
     $0 ~ pattern {                         # Match on the current line using the regex supplied in `pattern`.
       output = replacement                 # Working copy of the replacement template.
       gsub(/\{version\}/, version, output) # Substitute {version} with the latest version.

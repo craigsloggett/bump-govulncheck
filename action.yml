@@ -41,5 +41,5 @@ runs:
       env:
         FILE: ${{ inputs.file }}
         YAML_PATH: ${{ inputs.path }}
-        MATCH: ${{ inputs.match }}
-        REPLACE: ${{ inputs.replace }}
+        LINE_MATCH: ${{ inputs.match }}
+        LINE_REPLACE: ${{ inputs.replace }}
