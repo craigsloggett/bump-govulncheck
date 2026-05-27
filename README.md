@@ -11,7 +11,6 @@ Update a YAML value located by path:
   with:
     file: action.yml
     path: .inputs.govulncheck-version.default
-    match: 'v[0-9]+\.[0-9]+\.[0-9]+'
 ```
 
 Update a line by regex:
@@ -43,19 +42,19 @@ Open a pull request only when the file actually changed:
 
 ## Inputs
 
-| Input     | Required | Default | Description                                                                                                 |
-| --------- | -------- | ------- | ----------------------------------------------------------------------------------------------------------- |
-| `file`    | Yes      |         | Path to the file to update.                                                                                 |
-| `path`    | No       |         | yq expression locating the line to update (e.g. `.inputs.govulncheck-version.default`). Pair with `match`.  |
-| `match`   | No       |         | Regex. With `path`, matches the version substring on the located line. With `replace`, matches the line.    |
-| `replace` | No       |         | Replacement line. Use `{version}` as the placeholder for the new version. Pair with `match`.                |
+| Input     | Required | Default | Description                                                                                  |
+| --------- | -------- | ------- | -------------------------------------------------------------------------------------------- |
+| `file`    | Yes      |         | Path to the file to update.                                                                  |
+| `path`    | No       |         | yq expression locating the line to update (e.g. `.inputs.govulncheck-version.default`).      |
+| `match`   | No       |         | Regex matching the line to rewrite. Pair with `replace`.                                     |
+| `replace` | No       |         | Replacement line. Use `{version}` as the placeholder for the new version. Pair with `match`. |
 
-Provide either `path`+`match` (for YAML) or `match`+`replace` (for line-based files), not both.
+Provide either `path` (YAML mode) or `match`+`replace` (line mode), not both.
 
 For YAML replacements:
 
 - The path must begin with `.` and resolve to an existing line.
-- `match` is an extended regex (ERE) identifying the version substring on the line that `path` locates. Only the substring it matches is rewritten; the rest of the line is preserved.
+- The first `vX.Y.Z` substring on the resolved line is rewritten; the rest of the line is preserved.
 
 For line-based replacements:
 

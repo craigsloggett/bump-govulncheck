@@ -29,11 +29,7 @@ validate_inputs() (
   [ -f "${FILE}" ] || die "File not found: ${FILE}"
 
   if [ -n "${YAML_PATH}" ] && [ -n "${REPLACE}" ]; then
-    die "'path' and 'replace' are mutually exclusive; use 'path'+'match' for YAML or 'match'+'replace' for line-based files."
-  fi
-
-  if [ -n "${YAML_PATH}" ] && [ -z "${MATCH}" ]; then
-    die "'path' requires 'match'."
+    die "'path' and 'replace' are mutually exclusive; use 'path' for YAML or 'match'+'replace' for line-based files."
   fi
 
   if [ -n "${REPLACE}" ] && [ -z "${MATCH}" ]; then
@@ -41,7 +37,7 @@ validate_inputs() (
   fi
 
   if [ -z "${YAML_PATH}" ] && [ -z "${REPLACE}" ]; then
-    die "Provide either 'path'+'match' (YAML mode) or 'match'+'replace' (line mode)."
+    die "Provide either 'path' (YAML mode) or 'match'+'replace' (line mode)."
   fi
 
   if [ -n "${YAML_PATH}" ] && [ "${YAML_PATH#.}" = "${YAML_PATH}" ]; then
@@ -67,10 +63,12 @@ bump_yaml() {
   [ "${line_number}" != "0" ] ||
     die "Path ${YAML_PATH} not found in ${FILE}."
 
+  semver_pattern='v[0-9]+\.[0-9]+\.[0-9]+'
+
   # `set -e` would terminate on awk's non-zero exit before the case statement
   # can dispatch on the specific code, so capture status explicitly here.
   status=0
-  awk -v line="${line_number}" -v pattern="${MATCH}" -v version="${LATEST_VERSION}" '
+  awk -v line="${line_number}" -v pattern="${semver_pattern}" -v version="${LATEST_VERSION}" '
     NR == line {                  # Only operate on the line yq located.
       if (match($0, pattern)) {   # Find the version substring on that line.
         matched = 1
@@ -85,7 +83,7 @@ bump_yaml() {
 
   case "${status}" in
     0) ;;
-    2) die "Pattern '${MATCH}' did not match on line ${line_number} of ${FILE}." ;;
+    2) die "No version pattern found on line ${line_number} of ${FILE}." ;;
     *) exit 1 ;;
   esac
 
